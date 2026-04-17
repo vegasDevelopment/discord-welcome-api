@@ -1,55 +1,72 @@
-import sharp from 'sharp';
+import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// (İsteğe bağlı) Özel font yüklemek isterseniz:
+// GlobalFonts.registerFromPath(join(__dirname, 'fonts', 'YourFont.ttf'), 'CustomFont');
 
 export default async function handler(req, res) {
     const { username = 'Test', message = 'Sunucumuza hos geldin!' } = req.query;
     let { avatarUrl } = req.query;
+
     if (!avatarUrl) avatarUrl = 'https://cdn.discordapp.com/embed/avatars/0.png';
 
     try {
-        // 1. Avatarı yuvarlak yap
-        const avatarRes = await fetch(avatarUrl);
-        const avatarBuf = await avatarRes.arrayBuffer();
-        const roundedAvatar = await sharp(Buffer.from(avatarBuf))
-            .resize(150, 150)
-            .composite([{
-                input: Buffer.from(`<svg><circle cx="75" cy="75" r="75" fill="black"/></svg>`),
-                blend: 'dest-in'
-            }])
-            .png()
-            .toBuffer();
+        const canvas = createCanvas(800, 400);
+        const ctx = canvas.getContext('2d');
 
-        // 2. Arka plan (düz renk - Discord koyu tema)
-        const background = await sharp({
-            create: {
-                width: 800,
-                height: 400,
-                channels: 3,
-                background: { r: 44, g: 47, b: 51 }
-            }
-        }).png().toBuffer();
+        // Arka plan
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        gradient.addColorStop(0, '#4158D0');
+        gradient.addColorStop(1, '#C850C0');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 3. Metinleri SVG ile ekle
-        const svg = Buffer.from(`<svg width="800" height="400">
-            <rect x="25" y="25" width="750" height="350" fill="none" stroke="#5865F2" stroke-width="8"/>
-            <text x="250" y="190" font-family="Arial" font-size="42" font-weight="bold" fill="white">${username}</text>
-            <text x="250" y="240" font-family="Arial" font-size="26" fill="#b9bbbe">${message}</text>
-        </svg>`);
+        // Kenarlık
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 10;
+        ctx.strokeRect(25, 25, canvas.width - 50, canvas.height - 50);
 
-        const withText = await sharp(background)
-            .composite([{ input: svg }])
-            .png()
-            .toBuffer();
+        // Avatar
+        const avatarImage = await loadImage(avatarUrl);
+        const avatarSize = 150;
+        const avatarX = 70;
+        const avatarY = canvas.height / 2 - avatarSize / 2;
 
-        // 4. Avatarı ekle
-        const final = await sharp(withText)
-            .composite([{ input: roundedAvatar, left: 70, top: 125 }])
-            .png()
-            .toBuffer();
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(avatarImage, avatarX, avatarY, avatarSize, avatarSize);
+        ctx.restore();
 
+        // --- Yazılar için gölge ---
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 5;
+
+        // Kullanıcı adı (font fallback düzeltildi)
+        ctx.font = 'bold 36px "Segoe UI", "Arial", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(username, avatarX + avatarSize + 30, canvas.height / 2 - 20);
+
+        // Hoş geldin mesajı
+        ctx.font = '24px "Segoe UI", "Arial", sans-serif';
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillText(message, avatarX + avatarSize + 30, canvas.height / 2 + 30);
+
+        // Gölgeyi tamamen sıfırla
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        const buffer = canvas.toBuffer('image/png');
         res.setHeader('Content-Type', 'image/png');
-        res.status(200).send(final);
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err.message });
+        res.status(200).send(buffer);
+
+    } catch (error) {
+        console.error('Görsel oluşturulurken hata:', error);
+        res.status(500).json({ error: 'Görsel oluşturulamadı', detail: error.message });
     }
 }
