@@ -1,80 +1,79 @@
-import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
+// api.js
+const express = require('express');
+const Canvas = require('canvas');
+const path = require('path');
+const app = express();
 
-async function loadFontTTF() {
-  try {
-    const res = await fetch('https://github.com/rsms/inter/raw/master/docs/font-files/Inter-Regular.ttf');
-    if (res.ok) {
-      const buffer = Buffer.from(await res.arrayBuffer());
-      GlobalFonts.register(buffer, 'Inter');
-      return true;
+// Arka plan resimlerini yükle
+const bgWelcome = await Canvas.loadImage(path.join(__dirname, 'hoşgeldin.jpg'));
+const bgGoodbye = await Canvas.loadImage(path.join(__dirname, 'IMG_20260417_173121.jpg'));
+
+app.get('/generate', async (req, res) => {
+    const type = req.query.type; // 'welcome' veya 'goodbye'
+    const avatarUrl = req.query.avatarUrl;
+
+    if (!type || !avatarUrl) {
+        return res.status(400).send('type ve avatarUrl parametreleri gerekli');
     }
-  } catch (e) {
-    console.warn('Font yüklenemedi:', e.message);
-  }
-  return false;
-}
 
-export default async function handler(req, res) {
-    const { username = 'Test', message = 'Sunucumuza hos geldin!' } = req.query;
-    let { avatarUrl } = req.query;
-
-    if (!avatarUrl) avatarUrl = 'https://cdn.discordapp.com/embed/avatars/0.png';
-
-    await loadFontTTF();
+    let background;
+    if (type === 'welcome') background = bgWelcome;
+    else if (type === 'goodbye') background = bgGoodbye;
+    else return res.status(400).send('type welcome veya goodbye olmalı');
 
     try {
-        const canvas = createCanvas(800, 400);
+        // Avatar resmini yükle
+        const avatar = await Canvas.loadImage(avatarUrl);
+        
+        // Arka plan boyutunda canvas oluştur
+        const canvas = Canvas.createCanvas(background.width, background.height);
         const ctx = canvas.getContext('2d');
-
-        // Arka plan
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-        gradient.addColorStop(0, '#4158D0');
-        gradient.addColorStop(1, '#C850C0');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Kenarlık
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.lineWidth = 10;
-        ctx.strokeRect(25, 25, canvas.width - 50, canvas.height - 50);
-
-        // Avatar
-        const avatarImage = await loadImage(avatarUrl);
-        const avatarSize = 150;
-        const avatarX = 70;
-        const avatarY = canvas.height / 2 - avatarSize / 2;
-
+        
+        // Arka planı çiz
+        ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+        
+        // Profil resminin konumu ve boyutu (örnek: ortada, 200x200)
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 120; // daire yarıçapı
+        
+        // Profil resmini yuvarlak kesip çiz
         ctx.save();
         ctx.beginPath();
-        ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-        ctx.drawImage(avatarImage, avatarX, avatarY, avatarSize, avatarSize);
+        ctx.drawImage(avatar, centerX - radius, centerY - radius, radius * 2, radius * 2);
         ctx.restore();
-
-        // Gölge
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        ctx.shadowBlur = 5;
-
-        // Kullanıcı adı
-        ctx.font = 'bold 36px Inter';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(username, avatarX + avatarSize + 30, canvas.height / 2 - 20);
-
-        // Hoş geldin mesajı
-        ctx.font = '24px Inter';
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillText(message, avatarX + avatarSize + 30, canvas.height / 2 + 30);
-
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-
-        const buffer = canvas.toBuffer('image/png');
+        
+        // Renkli halkalar (çok renkli daire efekti)
+        const colors = type === 'welcome' 
+            ? ['#00FF00', '#32CD32', '#ADFF2F', '#7CFC00'] // hoş geldin yeşil
+            : ['#FF4500', '#FF6347', '#FF0000', '#DC143C']; // görüşürüz kırmızı
+        
+        for (let i = 0; i < colors.length; i++) {
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius + 5 + i * 8, 0, Math.PI * 2);
+            ctx.strokeStyle = colors[i % colors.length];
+            ctx.lineWidth = 6;
+            ctx.stroke();
+        }
+        
+        // Beyaz iç çerçeve
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        
+        // Çıktıyı gönder
         res.setHeader('Content-Type', 'image/png');
-        res.status(200).send(buffer);
-
-    } catch (error) {
-        console.error('Görsel oluşturulurken hata:', error);
-        res.status(500).json({ error: 'Görsel oluşturulamadı', detail: error.message });
+        res.send(canvas.toBuffer());
+        
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Görsel oluşturulurken hata');
     }
-}
+});
+
+app.listen(3000, () => console.log('API çalışıyor: http://localhost:3000'));
