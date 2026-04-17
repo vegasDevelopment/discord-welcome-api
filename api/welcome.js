@@ -1,8 +1,14 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas';
-import { dirname } from 'path';
+import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
+import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// 📁 Fontu kaydet (projeye eklediğiniz .ttf dosyasının yolu)
+GlobalFonts.registerFromPath(
+  join(__dirname, '../fonts/Inter-Regular.ttf'),
+  'Inter'
+);
 
 export default async function handler(req, res) {
     const { username = 'Test', message = 'Sunucumuza hos geldin!' } = req.query;
@@ -14,14 +20,14 @@ export default async function handler(req, res) {
         const canvas = createCanvas(800, 400);
         const ctx = canvas.getContext('2d');
 
-        // Arka plan gradient
+        // Arka plan
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
         gradient.addColorStop(0, '#4158D0');
         gradient.addColorStop(1, '#C850C0');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Kenarlık efekti
+        // Kenarlık
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.lineWidth = 10;
         ctx.strokeRect(25, 25, canvas.width - 50, canvas.height - 50);
@@ -40,21 +46,20 @@ export default async function handler(req, res) {
         ctx.drawImage(avatarImage, avatarX, avatarY, avatarSize, avatarSize);
         ctx.restore();
 
-        // Gölge ayarları
+        // Gölge
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 5;
 
-        // Kullanıcı adı
-        ctx.font = 'bold 36px "Segoe UI", "Arial", sans-serif';
+        // ✅ Kullanıcı adı - kaydettiğimiz fontu kullan
+        ctx.font = 'bold 36px "Inter", sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.fillText(username, avatarX + avatarSize + 30, canvas.height / 2 - 20);
 
-        // Hoş geldin mesajı
-        ctx.font = '24px "Segoe UI", "Arial", sans-serif';
+        // ✅ Hoş geldin mesajı
+        ctx.font = '24px "Inter", sans-serif';
         ctx.fillStyle = '#f0f0f0';
         ctx.fillText(message, avatarX + avatarSize + 30, canvas.height / 2 + 30);
 
-        // Gölgeyi temizle
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
 
