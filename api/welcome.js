@@ -1,11 +1,8 @@
-import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
-import { join, dirname } from 'path';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// (İsteğe bağlı) Özel font yüklemek isterseniz:
-// GlobalFonts.registerFromPath(join(__dirname, 'fonts', 'YourFont.ttf'), 'CustomFont');
 
 export default async function handler(req, res) {
     const { username = 'Test', message = 'Sunucumuza hos geldin!' } = req.query;
@@ -17,14 +14,14 @@ export default async function handler(req, res) {
         const canvas = createCanvas(800, 400);
         const ctx = canvas.getContext('2d');
 
-        // Arka plan
+        // Arka plan gradient
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
         gradient.addColorStop(0, '#4158D0');
         gradient.addColorStop(1, '#C850C0');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Kenarlık
+        // Kenarlık efekti
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.lineWidth = 10;
         ctx.strokeRect(25, 25, canvas.width - 50, canvas.height - 50);
@@ -43,11 +40,11 @@ export default async function handler(req, res) {
         ctx.drawImage(avatarImage, avatarX, avatarY, avatarSize, avatarSize);
         ctx.restore();
 
-        // --- Yazılar için gölge ---
+        // Gölge ayarları
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
         ctx.shadowBlur = 5;
 
-        // Kullanıcı adı (font fallback düzeltildi)
+        // Kullanıcı adı
         ctx.font = 'bold 36px "Segoe UI", "Arial", sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.fillText(username, avatarX + avatarSize + 30, canvas.height / 2 - 20);
@@ -57,7 +54,7 @@ export default async function handler(req, res) {
         ctx.fillStyle = '#f0f0f0';
         ctx.fillText(message, avatarX + avatarSize + 30, canvas.height / 2 + 30);
 
-        // Gölgeyi tamamen sıfırla
+        // Gölgeyi temizle
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
 
