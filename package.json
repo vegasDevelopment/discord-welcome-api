@@ -2,6 +2,7 @@
   "name": "discord-welcome-api",
   "version": "1.0.0",
   "dependencies": {
-    "imagecord": "^1.0.0"
+    "@devraikou/imagecord": "latest",
+    "@napi-rs/canvas": "^0.1.25"
   }
 }
